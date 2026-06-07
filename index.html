@@ -44,8 +44,8 @@
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-10 min-h-[300px] flex flex-col justify-center">
             
             <!-- STATE 1: Area Upload (Pilih File) -->
-            <!-- Input file disembunyikan secara visual namun aktif secara fungsional -->
-            <input type="file" id="file-input" accept=".eml" multiple class="hidden">
+            <!-- PERBAIKAN: Menggunakan "sr-only" bukan "hidden" agar file input tetap 100% terbaca oleh browser -->
+            <input type="file" id="file-input" accept=".eml" multiple class="sr-only">
             
             <label id="upload-state" for="file-input" class="flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl p-10 transition-all cursor-pointer">
                 <!-- Elemen div berpenampilan tombol -->
@@ -124,11 +124,8 @@
         </div>
     </main>
 
-    <!-- KEMBALI MENGGUNAKAN MODULE: Cara paling stabil untuk Vercel -->
-    <script type="module">
-        import PostalMime from 'https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm';
-        import JSZip from 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
-
+    <!-- PERBAIKAN: Menggunakan tag script klasik (TANPA type="module") agar dijamin tereksekusi langsung detik itu juga -->
+    <script>
         // Elemen DOM
         const dropZone = document.getElementById('upload-state');
         const fileInput = document.getElementById('file-input');
@@ -200,7 +197,7 @@
 
             // Gabungkan dengan file yang sudah ada
             pendingFiles = [...pendingFiles, ...newFiles];
-            showState('ready'); // Pindah ke layar tombol Convert
+            showState('ready'); // Pindah ke layar tombol Convert secara instan
         }
 
         // --- Logika Pembersihan HTML menjadi Teks ---
@@ -224,6 +221,25 @@
             processTotal.textContent = pendingFiles.length;
             processCurrent.textContent = '0';
             progressBar.style.width = '0%';
+
+            let JSZip;
+            let PostalMime;
+
+            try {
+                // Library konversi hanya dimuat SECARA DINAMIS pada saat tombol convert diklik
+                const [jszipModule, postalMimeModule] = await Promise.all([
+                    import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm'),
+                    import('https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm')
+                ]);
+                
+                JSZip = jszipModule.default;
+                PostalMime = postalMimeModule.default;
+            } catch (error) {
+                console.error("Gagal memuat library konversi:", error);
+                alert("Gagal memuat mesin konversi. Pastikan koneksi internet Anda stabil.");
+                showState('ready');
+                return;
+            }
 
             const zip = new JSZip();
             const parser = new PostalMime();
@@ -266,10 +282,10 @@
 
         // Saat file dipilih via dialog window
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
+            if (e.target.files && e.target.files.length > 0) {
                 handleFilesSelection(e.target.files);
                 // Reset input agar pengguna bisa memilih file yang sama lagi jika diperlukan
-                fileInput.value = ''; 
+                e.target.value = ''; 
             }
         });
 
@@ -293,7 +309,7 @@
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault(); 
             const dt = e.dataTransfer;
-            if (dt.files.length > 0) {
+            if (dt.files && dt.files.length > 0) {
                 handleFilesSelection(dt.files);
             }
         });
