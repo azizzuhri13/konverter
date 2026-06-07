@@ -190,11 +190,17 @@
 
         // --- Logika Menangani File yang Dipilih ---
         function handleFilesSelection(files) {
-            // Saring hanya file yang tampak seperti EML
-            const newFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.eml') || f.type === 'message/rfc822');
+            // Saring hanya file yang tampak seperti EML. 
+            // PERBAIKAN: Memperlonggar filter agar browser yang tidak mengenali mime-type tetap bisa meneruskan file .eml
+            const newFiles = Array.from(files).filter(f => 
+                f.name.toLowerCase().endsWith('.eml') || 
+                f.type === 'message/rfc822' || 
+                f.type === 'application/octet-stream' ||
+                f.type === '' // Beberapa browser mengembalikan tipe kosong untuk .eml
+            );
             
             if (newFiles.length === 0) {
-                alert("Tidak ada file EML yang terdeteksi. Mohon masukkan setidaknya satu file dengan ekstensi .eml");
+                alert("Tidak ada file EML yang terdeteksi. Mohon pastikan file berakhiran .eml");
                 return;
             }
 
