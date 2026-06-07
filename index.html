@@ -44,7 +44,7 @@
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-10 min-h-[300px] flex flex-col justify-center">
             
             <!-- STATE 1: Area Upload (Pilih File) -->
-            <!-- PERBAIKAN: Input file dikeluarkan dari dalam label agar tidak ada konflik klik di browser -->
+            <!-- Input file disembunyikan secara visual namun aktif secara fungsional -->
             <input type="file" id="file-input" accept=".eml" multiple class="hidden">
             
             <label id="upload-state" for="file-input" class="flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl p-10 transition-all cursor-pointer">
@@ -124,8 +124,11 @@
         </div>
     </main>
 
-    <!-- Menggunakan Tag Script Klasik agar tidak rentan crash saat load awal -->
-    <script>
+    <!-- KEMBALI MENGGUNAKAN MODULE: Cara paling stabil untuk Vercel -->
+    <script type="module">
+        import PostalMime from 'https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm';
+        import JSZip from 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
+
         // Elemen DOM
         const dropZone = document.getElementById('upload-state');
         const fileInput = document.getElementById('file-input');
@@ -189,8 +192,6 @@
 
         // --- Logika Menangani File yang Dipilih ---
         function handleFilesSelection(files) {
-            // PERBAIKAN: Menghilangkan filter ketat yang sering menyebabkan browser diam jika gagal mendeteksi MIME type.
-            // Selama file berhasil dipilih lewat dialog box, kita masukkan ke daftar proses.
             const newFiles = Array.from(files);
             
             if (newFiles.length === 0) {
@@ -223,24 +224,6 @@
             processTotal.textContent = pendingFiles.length;
             processCurrent.textContent = '0';
             progressBar.style.width = '0%';
-
-            let JSZip;
-            let PostalMime;
-
-            try {
-                // PERBAIKAN: Modul di-import DENGAN AMAN hanya pada saat tombol convert ditekan.
-                // Ini menjamin UI awal aplikasi tidak akan crash/mati walau internet sempat putus.
-                const jszipModule = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
-                const postalMimeModule = await import('https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm');
-                
-                JSZip = jszipModule.default;
-                PostalMime = postalMimeModule.default;
-            } catch (error) {
-                console.error("Gagal memuat library konversi:", error);
-                alert("Gagal memuat mesin sistem konversi. Tolong pastikan koneksi internet Anda stabil untuk memuat library.");
-                showState('ready');
-                return;
-            }
 
             const zip = new JSZip();
             const parser = new PostalMime();
