@@ -44,11 +44,10 @@
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-10 min-h-[300px] flex flex-col justify-center">
             
             <!-- STATE 1: Area Upload (Pilih File) -->
-            <!-- PERBAIKAN: Menggunakan "sr-only" bukan "hidden" agar file input tetap 100% terbaca oleh browser -->
+            <!-- FIX CASE 1: Input file dipisah dari label, cukup sr-only agar bekerja sempurna di HTML murni -->
             <input type="file" id="file-input" accept=".eml" multiple class="sr-only">
             
             <label id="upload-state" for="file-input" class="flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl p-10 transition-all cursor-pointer">
-                <!-- Elemen div berpenampilan tombol -->
                 <div class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition font-semibold text-lg flex items-center gap-2 pointer-events-none">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     Pilih File EML
@@ -58,7 +57,6 @@
 
             <!-- STATE 2: File Siap Dikonversi -->
             <div id="ready-state" class="hidden flex-col w-full">
-                <!-- Tambah file lagi -->
                 <div class="mb-4">
                     <label for="file-input" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1 cursor-pointer inline-flex">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -66,7 +64,6 @@
                     </label>
                 </div>
 
-                <!-- Baris Informasi File & Tombol Convert -->
                 <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div class="flex items-center gap-3 w-full md:w-auto">
                         <div class="bg-blue-100 text-blue-600 p-2 rounded-lg">
@@ -93,7 +90,6 @@
                 <h2 class="text-xl font-semibold text-slate-700 mb-2">Mengkonversi File...</h2>
                 <p class="text-slate-500 mb-6 text-center">Harap tunggu, sedang memproses file Anda.</p>
                 
-                <!-- Progress Bar -->
                 <div class="w-full max-w-md bg-slate-200 rounded-full h-4 mb-2 overflow-hidden shadow-inner">
                     <div id="progress-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-200" style="width: 0%"></div>
                 </div>
@@ -124,9 +120,11 @@
         </div>
     </main>
 
-    <!-- PERBAIKAN: Menggunakan tag script klasik (TANPA type="module") agar dijamin tereksekusi langsung detik itu juga -->
-    <script>
-        // Elemen DOM
+    <!-- FIX CASE 3: Menggunakan type="module" dan statis import. Ini yang PALING COCOK untuk Vercel -->
+    <script type="module">
+        import PostalMime from 'https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm';
+        import JSZip from 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
+
         const dropZone = document.getElementById('upload-state');
         const fileInput = document.getElementById('file-input');
         
@@ -143,21 +141,12 @@
         const btnDownload = document.getElementById('btn-download');
         const btnReset = document.getElementById('btn-reset');
 
-        // Variabel Penyimpanan
         let pendingFiles = [];
         let finalZipBlob = null;
 
-        // --- Mencegah file terbuka di tab baru secara tidak sengaja ---
-        window.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-        window.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
+        window.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); });
+        window.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); });
 
-        // --- Logika Navigasi UI ---
         function showState(state) {
             dropZone.classList.add('hidden');
             dropZone.classList.remove('flex');
@@ -187,20 +176,15 @@
             }
         }
 
-        // --- Logika Menangani File yang Dipilih ---
+        // FIX CASE 2: Membuang semua sistem filter ketat yang menggagalkan layar berganti
         function handleFilesSelection(files) {
-            const newFiles = Array.from(files);
+            if (!files || files.length === 0) return;
             
-            if (newFiles.length === 0) {
-                return;
-            }
-
-            // Gabungkan dengan file yang sudah ada
-            pendingFiles = [...pendingFiles, ...newFiles];
-            showState('ready'); // Pindah ke layar tombol Convert secara instan
+            // Langsung ambil semua file yang dipilih dan pindahkan ke layar Convert (tanpa syarat rumit)
+            pendingFiles = [...pendingFiles, ...Array.from(files)];
+            showState('ready'); 
         }
 
-        // --- Logika Pembersihan HTML menjadi Teks ---
         function extractPlainText(emailObj) {
             if (emailObj.text && emailObj.text.trim().length > 0) {
                 return emailObj.text;
@@ -212,43 +196,20 @@
             return "[Email ini tidak memiliki isi teks]";
         }
 
-        // --- Logika Pemrosesan Utama (Ketika klik Convert) ---
         async function runConversion() {
             if (pendingFiles.length === 0) return;
 
-            // Pindah ke UI Proses
             showState('processing');
             processTotal.textContent = pendingFiles.length;
             processCurrent.textContent = '0';
             progressBar.style.width = '0%';
 
-            let JSZip;
-            let PostalMime;
-
-            try {
-                // Library konversi hanya dimuat SECARA DINAMIS pada saat tombol convert diklik
-                const [jszipModule, postalMimeModule] = await Promise.all([
-                    import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm'),
-                    import('https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm')
-                ]);
-                
-                JSZip = jszipModule.default;
-                PostalMime = postalMimeModule.default;
-            } catch (error) {
-                console.error("Gagal memuat library konversi:", error);
-                alert("Gagal memuat mesin konversi. Pastikan koneksi internet Anda stabil.");
-                showState('ready');
-                return;
-            }
-
             const zip = new JSZip();
             const parser = new PostalMime();
             let successCount = 0;
 
-            // Proses file satu per satu
             for (let i = 0; i < pendingFiles.length; i++) {
                 const file = pendingFiles[i];
-                
                 try {
                     const arrayBuffer = await file.arrayBuffer();
                     const email = await parser.parse(arrayBuffer);
@@ -262,12 +223,10 @@
                     console.error(`Gagal memproses file ${file.name}:`, error);
                 }
 
-                // Update Progress UI
                 processCurrent.textContent = (i + 1).toString();
                 progressBar.style.width = `${((i + 1) / pendingFiles.length) * 100}%`;
             }
 
-            // Generate ZIP
             try {
                 finalZipBlob = await zip.generateAsync({ type: "blob" });
                 showState('done');
@@ -279,17 +238,13 @@
         }
 
         // --- Event Listeners UI ---
-
-        // Saat file dipilih via dialog window
         fileInput.addEventListener('change', (e) => {
             if (e.target.files && e.target.files.length > 0) {
                 handleFilesSelection(e.target.files);
-                // Reset input agar pengguna bisa memilih file yang sama lagi jika diperlukan
                 e.target.value = ''; 
             }
         });
 
-        // Drag & Drop pada area khusus
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => {
                 e.preventDefault(); 
@@ -314,10 +269,8 @@
             }
         });
 
-        // Tombol di State Ready
         btnConvert.addEventListener('click', runConversion);
 
-        // Tombol Selesai
         btnDownload.addEventListener('click', () => {
             if (!finalZipBlob) return;
             const url = URL.createObjectURL(finalZipBlob);
@@ -332,9 +285,7 @@
 
         btnReset.addEventListener('click', () => showState('upload'));
 
-        // Mulai di state upload
         showState('upload');
-
     </script>
 </body>
 </html>
