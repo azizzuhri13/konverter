@@ -1,291 +1,342 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konverter EML ke TXT Massal</title>
-    <!-- Tailwind CSS untuk styling -->
+    <title>EML to TXT Converter</title>
+    <!-- Load Tailwind CSS via CDN for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load JSZip for creating the zip file -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Custom styling to enhance Tailwind's defaults -->
     <style>
-        /* Animasi loading sederhana */
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3b82f6;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f3f4f6; /* Gray-100 */
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        /* Custom scrollbar for the file list */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 h-screen flex flex-col font-sans">
+<body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 shadow-sm p-4 flex justify-between items-center shrink-0">
-        <div class="flex items-center gap-2">
-            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-            <h1 class="text-xl font-bold text-slate-800">Konverter EML ke TXT</h1>
-        </div>
-    </header>
-
-    <!-- Area Utama -->
-    <main class="flex-1 flex flex-col p-4 md:p-8 w-full max-w-4xl mx-auto justify-center">
-        
+    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl">
         <div class="text-center mb-8">
-            <h2 class="text-3xl font-bold text-slate-800 mb-2">Konverter EML ke TXT</h2>
-            <p class="text-slate-500">Konversi file EML menjadi TXT murni secara gratis dan aman.</p>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">EML to TXT Converter</h1>
+            <p class="text-gray-500">Extract email bodies from EML files and download as a ZIP archive.</p>
         </div>
 
-        <!-- Wadah Utama Aplikasi -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-10 min-h-[300px] flex flex-col justify-center">
+        <!-- Drag & Drop Zone / File Input -->
+        <div id="dropZone" class="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center transition-colors duration-200 hover:bg-blue-50 cursor-pointer mb-6 group">
+            <svg class="mx-auto h-12 w-12 text-blue-400 group-hover:text-blue-500 mb-4 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <p class="text-lg font-medium text-gray-700">Click to select EML files</p>
+            <p class="text-sm text-gray-500 mt-1">or drag and drop them here</p>
+            <p class="text-xs text-gray-400 mt-2">Supports hundreds of files</p>
             
-            <!-- STATE 1: Area Upload (Pilih File) -->
-            <!-- FIX CASE 1: Input file dipisah dari label, cukup sr-only agar bekerja sempurna di HTML murni -->
-            <input type="file" id="file-input" accept=".eml" multiple class="sr-only">
-            
-            <label id="upload-state" for="file-input" class="flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl p-10 transition-all cursor-pointer">
-                <div class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition font-semibold text-lg flex items-center gap-2 pointer-events-none">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    Pilih File EML
-                </div>
-                <p class="text-slate-400 text-sm mt-4 pointer-events-none">Atau tarik dan lepas (drag & drop) file ke area ini</p>
-            </label>
-
-            <!-- STATE 2: File Siap Dikonversi -->
-            <div id="ready-state" class="hidden flex-col w-full">
-                <div class="mb-4">
-                    <label for="file-input" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1 cursor-pointer inline-flex">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Tambah File Lagi
-                    </label>
-                </div>
-
-                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div class="flex items-center gap-3 w-full md:w-auto">
-                        <div class="bg-blue-100 text-blue-600 p-2 rounded-lg">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-                        </div>
-                        <div>
-                            <p id="file-count-text" class="font-semibold text-slate-700">1 file ditambahkan</p>
-                            <p class="text-xs text-slate-500">Siap untuk dikonversi ke TXT</p>
-                        </div>
-                    </div>
-                    
-                    <div class="w-full md:w-auto flex justify-end">
-                        <button id="btn-convert" class="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition font-semibold text-lg flex items-center justify-center gap-2">
-                            Convert
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- STATE 3: Indikator Proses -->
-            <div id="processing-state" class="hidden flex-col items-center justify-center py-8">
-                <div class="loader mb-6"></div>
-                <h2 class="text-xl font-semibold text-slate-700 mb-2">Mengkonversi File...</h2>
-                <p class="text-slate-500 mb-6 text-center">Harap tunggu, sedang memproses file Anda.</p>
-                
-                <div class="w-full max-w-md bg-slate-200 rounded-full h-4 mb-2 overflow-hidden shadow-inner">
-                    <div id="progress-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-200" style="width: 0%"></div>
-                </div>
-                <div class="text-sm font-medium text-slate-600">
-                    Memproses <span id="process-current">0</span> dari <span id="process-total">0</span> file
-                </div>
-            </div>
-
-            <!-- STATE 4: Selesai -->
-            <div id="done-state" class="hidden flex-col items-center justify-center py-8">
-                <div class="bg-green-100 p-4 rounded-full mb-4">
-                    <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                </div>
-                <h2 class="text-2xl font-bold text-slate-800 mb-2">Konversi Berhasil!</h2>
-                <p class="text-slate-600 mb-8 text-center">File EML Anda telah berhasil dikonversi menjadi file teks.</p>
-                
-                <div class="flex flex-col sm:flex-row gap-4">
-                    <button id="btn-download" class="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-md transition font-semibold text-lg flex items-center justify-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        Unduh File ZIP
-                    </button>
-                    <button id="btn-reset" class="px-8 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition font-semibold text-lg">
-                        Konversi Lagi
-                    </button>
-                </div>
-            </div>
-
+            <!-- Hidden file input -->
+            <input type="file" id="fileInput" multiple accept=".eml" class="hidden">
         </div>
-    </main>
 
-    <!-- FIX CASE 3: Menggunakan type="module" dan statis import. Ini yang PALING COCOK untuk Vercel -->
-    <script type="module">
-        import PostalMime from 'https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm';
-        import JSZip from 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
-
-        const dropZone = document.getElementById('upload-state');
-        const fileInput = document.getElementById('file-input');
-        
-        const readyState = document.getElementById('ready-state');
-        const fileCountText = document.getElementById('file-count-text');
-        const btnConvert = document.getElementById('btn-convert');
-        
-        const processingState = document.getElementById('processing-state');
-        const progressBar = document.getElementById('progress-bar');
-        const processCurrent = document.getElementById('process-current');
-        const processTotal = document.getElementById('process-total');
-        
-        const doneState = document.getElementById('done-state');
-        const btnDownload = document.getElementById('btn-download');
-        const btnReset = document.getElementById('btn-reset');
-
-        let pendingFiles = [];
-        let finalZipBlob = null;
-
-        window.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); });
-        window.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); });
-
-        function showState(state) {
-            dropZone.classList.add('hidden');
-            dropZone.classList.remove('flex');
-            readyState.classList.add('hidden');
-            readyState.classList.remove('flex');
-            processingState.classList.add('hidden');
-            processingState.classList.remove('flex');
-            doneState.classList.add('hidden');
-            doneState.classList.remove('flex');
-
-            if (state === 'upload') {
-                dropZone.classList.remove('hidden');
-                dropZone.classList.add('flex');
-                fileInput.value = ''; 
-                pendingFiles = [];
-                finalZipBlob = null;
-            } else if (state === 'ready') {
-                readyState.classList.remove('hidden');
-                readyState.classList.add('flex');
-                fileCountText.textContent = `${pendingFiles.length} file ditambahkan`;
-            } else if (state === 'processing') {
-                processingState.classList.remove('hidden');
-                processingState.classList.add('flex');
-            } else if (state === 'done') {
-                doneState.classList.remove('hidden');
-                doneState.classList.add('flex');
-            }
-        }
-
-        // FIX CASE 2: Membuang semua sistem filter ketat yang menggagalkan layar berganti
-        function handleFilesSelection(files) {
-            if (!files || files.length === 0) return;
+        <!-- Status & File List -->
+        <div id="statusContainer" class="hidden mb-6">
+            <div class="flex justify-between items-center mb-2">
+                <span id="fileCount" class="font-medium text-gray-700">0 files selected</span>
+                <button id="clearBtn" class="text-sm text-red-500 hover:text-red-700 transition-colors">Clear Selection</button>
+            </div>
             
-            // Langsung ambil semua file yang dipilih dan pindahkan ke layar Convert (tanpa syarat rumit)
-            pendingFiles = [...pendingFiles, ...Array.from(files)];
-            showState('ready'); 
-        }
+            <!-- File List Preview (Scrollable) -->
+            <ul id="fileList" class="bg-gray-50 rounded-lg border border-gray-200 h-32 overflow-y-auto p-2 custom-scrollbar space-y-1">
+                <!-- List items will be injected here via JS -->
+            </ul>
 
-        function extractPlainText(emailObj) {
-            if (emailObj.text && emailObj.text.trim().length > 0) {
-                return emailObj.text;
-            } else if (emailObj.html) {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(emailObj.html, 'text/html');
-                return doc.body.textContent || "";
-            }
-            return "[Email ini tidak memiliki isi teks]";
-        }
+            <!-- Progress Bar (Hidden by default) -->
+            <div id="progressContainer" class="hidden mt-4">
+                <div class="flex justify-between text-sm text-gray-600 mb-1">
+                    <span id="progressText">Converting...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
 
-        async function runConversion() {
-            if (pendingFiles.length === 0) return;
+        <!-- Convert Button -->
+        <button id="convertBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow-md transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none hidden">
+            Convert & Download ZIP
+        </button>
+    </div>
 
-            showState('processing');
-            processTotal.textContent = pendingFiles.length;
-            processCurrent.textContent = '0';
-            progressBar.style.width = '0%';
+    <script>
+        // DOM Elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const statusContainer = document.getElementById('statusContainer');
+        const fileCountSpan = document.getElementById('fileCount');
+        const fileListUL = document.getElementById('fileList');
+        const clearBtn = document.getElementById('clearBtn');
+        const convertBtn = document.getElementById('convertBtn');
+        
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const progressPercent = document.getElementById('progressPercent');
 
-            const zip = new JSZip();
-            const parser = new PostalMime();
-            let successCount = 0;
+        let selectedFiles = [];
 
-            for (let i = 0; i < pendingFiles.length; i++) {
-                const file = pendingFiles[i];
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const email = await parser.parse(arrayBuffer);
-                    
-                    const plainText = extractPlainText(email);
-                    let txtFilename = file.name.replace(/\.eml$/i, '') + '.txt';
-                    
-                    zip.file(txtFilename, plainText);
-                    successCount++;
-                } catch (error) {
-                    console.error(`Gagal memproses file ${file.name}:`, error);
-                }
+        // Event Listeners for UI interaction
+        dropZone.addEventListener('click', () => fileInput.click());
 
-                processCurrent.textContent = (i + 1).toString();
-                progressBar.style.width = `${((i + 1) / pendingFiles.length) * 100}%`;
-            }
-
-            try {
-                finalZipBlob = await zip.generateAsync({ type: "blob" });
-                showState('done');
-            } catch (error) {
-                console.error("Gagal membuat ZIP:", error);
-                alert("Terjadi kesalahan saat mengompresi file ZIP.");
-                showState('ready');
-            }
-        }
-
-        // --- Event Listeners UI ---
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) {
-                handleFilesSelection(e.target.files);
-                e.target.value = ''; 
-            }
+        // Drag and Drop implementation
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
         });
 
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
         ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault(); 
-                dropZone.classList.add('border-blue-500', 'bg-blue-100');
-                dropZone.classList.remove('bg-slate-50', 'border-slate-300');
-            }, false);
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('bg-blue-100', 'border-blue-500'));
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('border-blue-500', 'bg-blue-100');
-                dropZone.classList.add('bg-slate-50', 'border-slate-300');
-            }, false);
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('bg-blue-100', 'border-blue-500'));
         });
 
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault(); 
-            const dt = e.dataTransfer;
-            if (dt.files && dt.files.length > 0) {
-                handleFilesSelection(dt.files);
+        dropZone.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFileSelect, false);
+        clearBtn.addEventListener('click', clearSelection);
+        convertBtn.addEventListener('click', processFiles);
+
+        // File Handling Functions
+        function handleDrop(e) {
+            let dt = e.dataTransfer;
+            let files = dt.files;
+            addFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            let files = e.target.files;
+            addFiles(files);
+        }
+
+        function addFiles(fileList) {
+            // Filter only .eml files
+            const newFiles = Array.from(fileList).filter(file => file.name.toLowerCase().endsWith('.eml'));
+            
+            if (newFiles.length === 0) {
+                alert("Please select valid .eml files.");
+                return;
             }
-        });
 
-        btnConvert.addEventListener('click', runConversion);
+            selectedFiles = [...selectedFiles, ...newFiles];
+            updateUI();
+        }
 
-        btnDownload.addEventListener('click', () => {
-            if (!finalZipBlob) return;
-            const url = URL.createObjectURL(finalZipBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Hasil_Konversi_EML_${new Date().getTime()}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        });
+        function clearSelection() {
+            selectedFiles = [];
+            fileInput.value = ""; // Reset input
+            updateUI();
+        }
 
-        btnReset.addEventListener('click', () => showState('upload'));
+        function updateUI() {
+            if (selectedFiles.length > 0) {
+                statusContainer.classList.remove('hidden');
+                convertBtn.classList.remove('hidden');
+                convertBtn.disabled = false;
+                fileCountSpan.textContent = `${selectedFiles.length} file(s) selected`;
+                
+                // Update file list preview
+                fileListUL.innerHTML = '';
+                selectedFiles.slice(0, 100).forEach(file => { // Show up to 100 for performance
+                    const li = document.createElement('li');
+                    li.className = 'text-sm text-gray-600 truncate';
+                    li.textContent = `📄 ${file.name}`;
+                    fileListUL.appendChild(li);
+                });
+                
+                if (selectedFiles.length > 100) {
+                    const li = document.createElement('li');
+                    li.className = 'text-sm text-gray-400 italic';
+                    li.textContent = `... and ${selectedFiles.length - 100} more`;
+                    fileListUL.appendChild(li);
+                }
+                
+                // Reset progress bar state
+                progressContainer.classList.add('hidden');
+                progressBar.style.width = '0%';
+                
+            } else {
+                statusContainer.classList.add('hidden');
+                convertBtn.classList.add('hidden');
+            }
+        }
 
-        showState('upload');
+        // --- EML Parsing Logic ---
+        // This is a lightweight parser designed specifically to extract the plain-text body
+        // and ignore headers/HTML parts for this specific use case.
+        function parseEmlBody(emlText) {
+            // 1. Separate headers from the main body using the standard double newline
+            const boundaryMatch = emlText.match(/^Content-Type:.*boundary="?([^";]+)"?/im);
+            const doubleNewlineIndex = emlText.indexOf('\r\n\r\n') !== -1 ? emlText.indexOf('\r\n\r\n') : emlText.indexOf('\n\n');
+            
+            if (doubleNewlineIndex === -1) return "Could not parse email body.";
+
+            let rawBody = emlText.substring(doubleNewlineIndex).trim();
+
+            // 2. Handle Multipart emails
+            if (boundaryMatch && boundaryMatch[1]) {
+                const boundary = boundaryMatch[1];
+                // Split by boundary
+                const parts = rawBody.split(`--${boundary}`);
+                
+                // Try to find the plain text part
+                for (let part of parts) {
+                    if (part.includes('Content-Type: text/plain')) {
+                        return extractContentFromPart(part);
+                    }
+                }
+                
+                // If no plain text found, try to fallback to HTML and strip tags (basic fallback)
+                for (let part of parts) {
+                    if (part.includes('Content-Type: text/html')) {
+                        let htmlContent = extractContentFromPart(part);
+                        // Very basic HTML stripping
+                        return htmlContent.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
+                    }
+                }
+                return "No text/plain or text/html content found in this multipart email.";
+            }
+
+            // 3. Handle single part emails (Not multipart)
+            // Just return everything after the headers
+            return rawBody;
+        }
+
+        function extractContentFromPart(part) {
+            // Find where headers of this part end
+            const doubleNewlineIndex = part.indexOf('\r\n\r\n') !== -1 ? part.indexOf('\r\n\r\n') : part.indexOf('\n\n');
+            if (doubleNewlineIndex === -1) return part.trim();
+
+            let contentHeaders = part.substring(0, doubleNewlineIndex);
+            let contentBody = part.substring(doubleNewlineIndex).trim();
+
+            // Handle Quoted-Printable encoding if present
+            if (contentHeaders.includes('Content-Transfer-Encoding: quoted-printable')) {
+                return decodeQuotedPrintable(contentBody);
+            }
+            
+            // Handle Base64 encoding if present
+            if (contentHeaders.includes('Content-Transfer-Encoding: base64')) {
+                try {
+                     return atob(contentBody.replace(/\s/g, ''));
+                } catch(e) {
+                     return contentBody; // Fallback if base64 fails
+                }
+            }
+
+            return contentBody;
+        }
+
+        // Basic decoder for quoted-printable
+        function decodeQuotedPrintable(str) {
+            str = str.replace(/=\r?\n/g, ''); // Soft line breaks
+            return str.replace(/=([a-fA-F0-9]{2})/g, function(match, hex) {
+                return String.fromCharCode(parseInt(hex, 16));
+            });
+        }
+
+        // --- Main Processing Function ---
+        async function processFiles() {
+            if (selectedFiles.length === 0) return;
+
+            convertBtn.disabled = true;
+            convertBtn.textContent = 'Processing...';
+            progressContainer.classList.remove('hidden');
+            
+            const zip = new JSZip();
+            const totalFiles = selectedFiles.length;
+            let processedCount = 0;
+
+            for (let i = 0; i < totalFiles; i++) {
+                const file = selectedFiles[i];
+                try {
+                    // Read file content
+                    const text = await file.text();
+                    
+                    // Parse EML to get body text
+                    const bodyText = parseEmlBody(text);
+                    
+                    // Create a safe filename by replacing .eml with .txt
+                    let safeName = file.name.replace(/\.eml$/i, '.txt');
+                    
+                    // Add to zip
+                    zip.file(safeName, bodyText);
+
+                } catch (error) {
+                    console.error(`Error processing ${file.name}:`, error);
+                    // Add error note in the txt file if it fails
+                    zip.file(file.name.replace(/\.eml$/i, '_error.txt'), `Error converting file: ${error.message}`);
+                }
+
+                // Update Progress UI
+                processedCount++;
+                const percent = Math.round((processedCount / totalFiles) * 100);
+                progressBar.style.width = `${percent}%`;
+                progressPercent.textContent = `${percent}%`;
+                progressText.textContent = `Converting ${processedCount} of ${totalFiles}...`;
+
+                // Small delay to allow UI to update during heavy processing
+                if (i % 10 === 0) {
+                     await new Promise(resolve => setTimeout(resolve, 0)); 
+                }
+            }
+
+            // Generate and download ZIP
+            progressText.textContent = 'Generating ZIP file...';
+            try {
+                const content = await zip.generateAsync({ type: "blob" });
+                
+                // Create download link
+                const url = window.URL.createObjectURL(content);
+                const a = document.createElement("a");
+                a.style.display = "none";
+                a.href = url;
+                a.download = `converted_emails_${Date.now()}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                progressText.textContent = 'Complete! ZIP downloaded.';
+                convertBtn.textContent = 'Convert & Download ZIP';
+                convertBtn.disabled = false;
+                
+            } catch (error) {
+                console.error("Error generating zip:", error);
+                progressText.textContent = 'Error generating ZIP.';
+                progressText.classList.add('text-red-500');
+            }
+        }
     </script>
 </body>
 </html>
