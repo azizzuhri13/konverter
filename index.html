@@ -44,11 +44,10 @@
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-10 min-h-[300px] flex flex-col justify-center">
             
             <!-- STATE 1: Area Upload (Pilih File) -->
-            <!-- PERBAIKAN FINAL: Menggunakan murni <label> tanpa campur tangan klik JS -->
+            <!-- PERBAIKAN: Input file dikeluarkan dari dalam label agar tidak ada konflik klik di browser -->
+            <input type="file" id="file-input" accept=".eml" multiple class="hidden">
+            
             <label id="upload-state" for="file-input" class="flex flex-col items-center justify-center w-full h-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl p-10 transition-all cursor-pointer">
-                <!-- Input disembunyikan dengan sr-only agar tetap aktif di sistem browser -->
-                <input type="file" id="file-input" accept=".eml" multiple class="sr-only">
-                
                 <!-- Elemen div berpenampilan tombol -->
                 <div class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition font-semibold text-lg flex items-center gap-2 pointer-events-none">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -61,7 +60,6 @@
             <div id="ready-state" class="hidden flex-col w-full">
                 <!-- Tambah file lagi -->
                 <div class="mb-4">
-                    <!-- PERBAIKAN: Tombol tambah juga menggunakan label bawaan -->
                     <label for="file-input" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-1 cursor-pointer inline-flex">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         Tambah File Lagi
@@ -126,11 +124,8 @@
         </div>
     </main>
 
-    <!-- Menggunakan tipe ES Module yang didukung secara natif di Vercel/Hosting -->
-    <script type="module">
-        import PostalMime from 'https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm';
-        import JSZip from 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
-
+    <!-- Menggunakan Tag Script Klasik agar tidak rentan crash saat load awal -->
+    <script>
         // Elemen DOM
         const dropZone = document.getElementById('upload-state');
         const fileInput = document.getElementById('file-input');
@@ -194,22 +189,17 @@
 
         // --- Logika Menangani File yang Dipilih ---
         function handleFilesSelection(files) {
-            // Saring hanya file yang tampak seperti EML
-            const newFiles = Array.from(files).filter(f => 
-                f.name.toLowerCase().endsWith('.eml') || 
-                f.type === 'message/rfc822' || 
-                f.type === 'application/octet-stream' ||
-                f.type === '' // Beberapa browser mengembalikan tipe kosong untuk .eml
-            );
+            // PERBAIKAN: Menghilangkan filter ketat yang sering menyebabkan browser diam jika gagal mendeteksi MIME type.
+            // Selama file berhasil dipilih lewat dialog box, kita masukkan ke daftar proses.
+            const newFiles = Array.from(files);
             
             if (newFiles.length === 0) {
-                alert("Tidak ada file EML yang terdeteksi. Mohon pastikan file berakhiran .eml");
                 return;
             }
 
             // Gabungkan dengan file yang sudah ada
             pendingFiles = [...pendingFiles, ...newFiles];
-            showState('ready');
+            showState('ready'); // Pindah ke layar tombol Convert
         }
 
         // --- Logika Pembersihan HTML menjadi Teks ---
@@ -233,6 +223,24 @@
             processTotal.textContent = pendingFiles.length;
             processCurrent.textContent = '0';
             progressBar.style.width = '0%';
+
+            let JSZip;
+            let PostalMime;
+
+            try {
+                // PERBAIKAN: Modul di-import DENGAN AMAN hanya pada saat tombol convert ditekan.
+                // Ini menjamin UI awal aplikasi tidak akan crash/mati walau internet sempat putus.
+                const jszipModule = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
+                const postalMimeModule = await import('https://cdn.jsdelivr.net/npm/postal-mime@2.2.14/+esm');
+                
+                JSZip = jszipModule.default;
+                PostalMime = postalMimeModule.default;
+            } catch (error) {
+                console.error("Gagal memuat library konversi:", error);
+                alert("Gagal memuat mesin sistem konversi. Tolong pastikan koneksi internet Anda stabil untuk memuat library.");
+                showState('ready');
+                return;
+            }
 
             const zip = new JSZip();
             const parser = new PostalMime();
@@ -273,9 +281,7 @@
 
         // --- Event Listeners UI ---
 
-        // PERBAIKAN: Semua perintah '.click()' dihapus karena <label> sudah menanganinya otomatis!
-
-        // Saat file dipilih via dialog window (otomatis terbuka dari trigger <label>)
+        // Saat file dipilih via dialog window
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
                 handleFilesSelection(e.target.files);
@@ -284,10 +290,10 @@
             }
         });
 
-        // 2. Drag & Drop pada area khusus
+        // Drag & Drop pada area khusus
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => {
-                e.preventDefault(); // Mencegah aksi bawaan agar file bisa dilepas
+                e.preventDefault(); 
                 dropZone.classList.add('border-blue-500', 'bg-blue-100');
                 dropZone.classList.remove('bg-slate-50', 'border-slate-300');
             }, false);
@@ -302,17 +308,17 @@
         });
 
         dropZone.addEventListener('drop', (e) => {
-            e.preventDefault(); // Sangat penting agar browser tidak mendownload file saat dilepas
+            e.preventDefault(); 
             const dt = e.dataTransfer;
             if (dt.files.length > 0) {
                 handleFilesSelection(dt.files);
             }
         });
 
-        // 3. Tombol di State Ready
+        // Tombol di State Ready
         btnConvert.addEventListener('click', runConversion);
 
-        // 4. Tombol Selesai
+        // Tombol Selesai
         btnDownload.addEventListener('click', () => {
             if (!finalZipBlob) return;
             const url = URL.createObjectURL(finalZipBlob);
